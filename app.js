@@ -31,31 +31,68 @@ const LOCAL_ITEM_FALLBACK = [
   'Sticker | Vitality (Holo) | Paris 2023',
 ];
 
-const STORAGE_KEYS = {
-  users: 'cs2pl.users',
-  session: 'cs2pl.session',
-};
+// API configuration
+const API_BASE = window.location.origin;
 
-function readUsers() {
-  const raw = localStorage.getItem(STORAGE_KEYS.users);
-  return raw ? JSON.parse(raw) : {};
+// API helper functions
+async function apiRequest(endpoint, options = {}) {
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Request failed' }));
+    throw new Error(error.error || 'Request failed');
+  }
+  
+  return response.json();
 }
 
-function writeUsers(users) {
-  localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(users));
+async function getAuthUser() {
+  try {
+    const data = await apiRequest('/auth/user');
+    return data;
+  } catch (err) {
+    return { user: null, authenticated: false };
+  }
 }
 
-function getSession() {
-  const raw = localStorage.getItem(STORAGE_KEYS.session);
-  return raw ? JSON.parse(raw) : null;
+async function getUserData() {
+  try {
+    const data = await apiRequest('/api/user/data');
+    return data.user;
+  } catch (err) {
+    console.error('Failed to load user data:', err);
+    return null;
+  }
 }
 
-function setSession(username) {
-  localStorage.setItem(STORAGE_KEYS.session, JSON.stringify({ username }));
+async function saveUserData(userData, recaptchaToken = null) {
+  try {
+    const data = await apiRequest('/api/user/data', {
+      method: 'POST',
+      body: JSON.stringify({ userData, recaptchaToken }),
+    });
+    return data.user;
+  } catch (err) {
+    console.error('Failed to save user data:', err);
+    throw err;
+  }
 }
 
-function clearSession() {
-  localStorage.removeItem(STORAGE_KEYS.session);
+async function logout() {
+  try {
+    await apiRequest('/auth/logout');
+    return true;
+  } catch (err) {
+    console.error('Logout failed:', err);
+    return false;
+  }
 }
 
 function uid() {
@@ -284,15 +321,24 @@ function escapeHtml(s) {
     .replaceAll("'", '&#039;');
 }
 
-function persistUser(user) {
-  const users = readUsers();
-  users[user.username] = user;
-  writeUsers(users);
-}
-
-function loadUser(username) {
-  const users = readUsers();
-  return users[username] || null;
+async function persistUser(user) {
+  try {
+    // Get reCAPTCHA token if available
+    let recaptchaToken = null;
+    if (window.grecaptcha && window.RECAPTCHA_SITE_KEY && window.RECAPTCHA_SITE_KEY !== 'YOUR_RECAPTCHA_SITE_KEY') {
+      try {
+        recaptchaToken = await window.grecaptcha.execute(window.RECAPTCHA_SITE_KEY, { action: 'save_user_data' });
+      } catch (err) {
+        console.warn('reCAPTCHA failed, continuing without it');
+      }
+    }
+    
+    const updatedUser = await saveUserData(user, recaptchaToken);
+    return updatedUser;
+  } catch (err) {
+    console.error('Failed to persist user:', err);
+    throw err;
+  }
 }
 
 function showAppView(show) {
@@ -315,81 +361,44 @@ function renderUserContext() {
   renderTable();
 }
 
-// Auth logic
-function bindAuth() {
-  const tabLogin = $('#tab-login');
-  const tabSignup = $('#tab-signup');
-  const loginForm = $('#login-form');
-  const signupForm = $('#signup-form');
-  const loginErr = $('#login-error');
-  const signupErr = $('#signup-error');
-
-  tabLogin.addEventListener('click', () => {
-    tabLogin.classList.add('active');
-    tabSignup.classList.remove('active');
-    loginForm.classList.add('visible');
-    signupForm.classList.remove('visible');
-  });
-  tabSignup.addEventListener('click', () => {
-    tabSignup.classList.add('active');
-    tabLogin.classList.remove('active');
-    signupForm.classList.add('visible');
-    loginForm.classList.remove('visible');
-  });
-
-  loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    loginErr.textContent = '';
-    const username = $('#login-username').value.trim();
-    const password = $('#login-password').value;
-    const user = loadUser(username);
-    if (!user) { loginErr.textContent = 'User not found.'; return; }
-    const hash = await sha256Hex(user.salt + ':' + password);
-    if (hash !== user.passwordHash) { loginErr.textContent = 'Invalid credentials.'; return; }
-    currentUser = user;
-    if (!currentUser.displayCurrency) currentUser.displayCurrency = currentUser.baseCurrency;
-    setSession(username);
-    showAppView(true);
-    renderUserContext();
-    // Try refreshing rates silently
-    tryRefreshRates();
-  });
-
-  signupForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    signupErr.textContent = '';
-    const username = $('#signup-username').value.trim();
-    const password = $('#signup-password').value;
-    const baseCurrency = $('#signup-currency').value;
-    if (!username || !password) { signupErr.textContent = 'Enter username and password.'; return; }
-    const users = readUsers();
-    if (users[username]) { signupErr.textContent = 'Username already exists.'; return; }
-    const salt = randomSalt();
-    const passwordHash = await sha256Hex(salt + ':' + password);
-    const user = {
-      username,
-      salt,
-      passwordHash,
-      baseCurrency,
-      displayCurrency: baseCurrency,
-      rates: getDefaultRates(baseCurrency),
-      transactions: [],
-    };
-    users[username] = user;
-    writeUsers(users);
-    currentUser = user;
-    setSession(username);
-    showAppView(true);
-    renderUserContext();
-    tryRefreshRates();
-  });
+// Auth logic - Steam authentication is handled server-side
+async function checkAuth() {
+  try {
+    const authData = await getAuthUser();
+    if (authData.authenticated && authData.user) {
+      // Load full user data including transactions
+      const userData = await getUserData();
+      if (userData) {
+        currentUser = userData;
+        if (!currentUser.displayCurrency) {
+          currentUser.displayCurrency = currentUser.baseCurrency || 'USD';
+        }
+        if (!currentUser.rates) {
+          currentUser.rates = getDefaultRates(currentUser.baseCurrency || 'USD');
+        }
+        if (!currentUser.transactions) {
+          currentUser.transactions = [];
+        }
+        showAppView(true);
+        renderUserContext();
+        tryRefreshRates();
+        return true;
+      }
+    }
+    showAppView(false);
+    return false;
+  } catch (err) {
+    console.error('Auth check failed:', err);
+    showAppView(false);
+    return false;
+  }
 }
 
 async function tryRefreshRates() {
   try {
     const rates = await fetchRates(currentUser.baseCurrency);
     currentUser.rates = { ...currentUser.rates, ...rates };
-    persistUser(currentUser);
+    await persistUser(currentUser);
     renderRatesList(currentUser);
     renderStats();
     renderTable();
@@ -400,10 +409,12 @@ async function tryRefreshRates() {
 
 // App bindings
 function bindApp() {
-  $('#logout').addEventListener('click', () => {
-    clearSession();
+  $('#logout').addEventListener('click', async () => {
+    await logout();
     currentUser = null;
     showAppView(false);
+    // Reload to clear any cached state
+    window.location.reload();
   });
 
   $('#open-settings').addEventListener('click', () => {
@@ -412,7 +423,7 @@ function bindApp() {
     $('#settings-modal').showModal();
   });
 
-  $('#save-settings').addEventListener('click', (e) => {
+  $('#save-settings').addEventListener('click', async (e) => {
     e.preventDefault();
     const newBase = $('#base-currency').value;
     if (newBase !== currentUser.baseCurrency) {
@@ -438,7 +449,7 @@ function bindApp() {
       populateCurrencySelect($('#tx-currency'), currentUser.baseCurrency);
       populateCurrencySelect($('#base-currency'), currentUser.baseCurrency);
     }
-    persistUser(currentUser);
+    await persistUser(currentUser);
     $('#settings-modal').close();
     renderStats();
     renderTable();
@@ -451,7 +462,7 @@ function bindApp() {
     btn.disabled = true;
     const rates = await fetchRates(currentUser.baseCurrency);
     currentUser.rates = { ...currentUser.rates, ...rates };
-    persistUser(currentUser);
+    await persistUser(currentUser);
     renderRatesList(currentUser);
     renderStats();
     renderTable();
@@ -459,9 +470,9 @@ function bindApp() {
     btn.disabled = false;
   });
 
-  $('#display-currency').addEventListener('change', () => {
+  $('#display-currency').addEventListener('change', async () => {
     currentUser.displayCurrency = $('#display-currency').value;
-    persistUser(currentUser);
+    await persistUser(currentUser);
     renderStats();
     renderTable();
   });
@@ -470,7 +481,7 @@ function bindApp() {
     renderTable();
   });
 
-  $('#tx-form').addEventListener('submit', (e) => {
+  $('#tx-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const date = $('#tx-date').value;
     const itemName = $('#tx-item').value.trim();
@@ -485,21 +496,21 @@ function bindApp() {
 
     const tx = { id: uid(), date, itemName, type, notes, buyPriceBase: buyBase, sellPriceBase: sell ? sellBase : null };
     currentUser.transactions.push(tx);
-    persistUser(currentUser);
+    await persistUser(currentUser);
     renderStats();
     renderTable();
     $('#tx-form').reset();
   });
 
   // Row actions (edit/delete)
-  $('#tx-tbody').addEventListener('click', (e) => {
+  $('#tx-tbody').addEventListener('click', async (e) => {
     const btn = e.target.closest('button[data-action]');
     if (!btn) return;
     const id = btn.getAttribute('data-id');
     const action = btn.getAttribute('data-action');
     if (action === 'delete') {
       currentUser.transactions = currentUser.transactions.filter((t) => t.id !== id);
-      persistUser(currentUser);
+      await persistUser(currentUser);
       renderStats();
       renderTable();
     } else if (action === 'edit') {
@@ -518,7 +529,7 @@ function bindApp() {
       $('#tx-currency').value = disp;
       // Replace submit handler once to update
       const form = $('#tx-form');
-      const handler = (ev) => {
+      const handler = async (ev) => {
         ev.preventDefault();
         const date = $('#tx-date').value;
         const itemName = $('#tx-item').value.trim();
@@ -530,7 +541,7 @@ function bindApp() {
         t.date = date; t.itemName = itemName; t.type = type; t.notes = notes;
         t.buyPriceBase = toBase(buy, currency, currentUser);
         t.sellPriceBase = $('#tx-sell').value ? toBase(sell, currency, currentUser) : null;
-        persistUser(currentUser);
+        await persistUser(currentUser);
         renderStats();
         renderTable();
         form.reset();
@@ -580,7 +591,7 @@ function bindApp() {
       if (data.baseCurrency && CURRENCIES.some((c) => c.code === data.baseCurrency)) currentUser.baseCurrency = data.baseCurrency;
       if (data.displayCurrency && CURRENCIES.some((c) => c.code === data.displayCurrency)) currentUser.displayCurrency = data.displayCurrency;
       if (data.rates) currentUser.rates = { ...currentUser.rates, ...data.rates };
-      persistUser(currentUser);
+      await persistUser(currentUser);
       renderUserContext();
     } catch (err) {
       alert('Import failed: ' + err.message);
@@ -593,23 +604,10 @@ function bindApp() {
   bindItemTypeahead();
 }
 
-function boot() {
-  bindAuth();
+async function boot() {
   bindApp();
-  // Restore session
-  const session = getSession();
-  if (session?.username) {
-    const user = loadUser(session.username);
-    if (user) {
-      currentUser = user;
-      showAppView(true);
-      renderUserContext();
-      tryRefreshRates();
-      return;
-    }
-  }
-  // default to auth view state
-  $('#tab-login').click();
+  // Check authentication status
+  await checkAuth();
 }
 
 document.addEventListener('DOMContentLoaded', boot);
@@ -620,10 +618,22 @@ function bindItemTypeahead() {
   const box = $('#item-suggest');
   let lastQuery = '';
   let pending = 0;
+  let abortController = null;
 
-  function hide() { box.classList.add('hidden'); box.innerHTML = ''; }
+  function hide() { 
+    box.classList.add('hidden'); 
+    box.innerHTML = ''; 
+    if (abortController) {
+      abortController.abort();
+      abortController = null;
+    }
+  }
+
   function show(items, source = '') {
-    if (!items || items.length === 0) { hide(); return; }
+    if (!items || items.length === 0) { 
+      hide(); 
+      return; 
+    }
     box.innerHTML = '';
     items.slice(0, 30).forEach((name) => {
       const row = document.createElement('div');
@@ -633,117 +643,180 @@ function bindItemTypeahead() {
       title.textContent = name;
       const meta = document.createElement('div');
       meta.className = 'meta';
-      meta.textContent = source || 'CS2';
+      meta.textContent = source || 'Steam Market';
       row.appendChild(title);
       row.appendChild(meta);
       row.addEventListener('click', () => {
         input.value = name;
         hide();
+        input.focus();
       });
       box.appendChild(row);
     });
     box.classList.remove('hidden');
   }
 
-  const debounced = debounce(async () => {
-    const q = input.value.trim();
-    if (!q || q.length < 1) { hide(); return; }
-    lastQuery = q;
-    const myTurn = ++pending;
-    const allResults = new Set();
+  async function searchSteamMarket(query) {
+    const results = new Set();
+    const queryLower = query.toLowerCase();
+    const queryWords = queryLower.split(/\s+/).filter(w => w.length > 0);
     
-    // Try CSFloat API (may be blocked by CORS, but worth trying)
     try {
-      const csFloatUrl = `https://csfloat.com/api/v1/listings?market_hash_name=${encodeURIComponent(q)}&limit=50`;
-      const csFloatRes = await fetch(csFloatUrl, { 
+      // Primary search using Steam Community Market API
+      const url = `https://steamcommunity.com/market/search/render/?appid=730&norender=1&count=100&query=${encodeURIComponent(query)}`;
+      const res = await fetch(url, { 
         method: 'GET',
-        headers: { 'Accept': 'application/json' },
-        mode: 'cors'
+        signal: abortController?.signal
       });
-      if (csFloatRes.ok) {
-        const csFloatData = await csFloatRes.json();
-        if (Array.isArray(csFloatData) && csFloatData.length > 0) {
-          csFloatData.forEach((item) => {
-            if (item.market_hash_name) allResults.add(item.market_hash_name);
-          });
-        }
-      }
-    } catch (_) {
-      // CSFloat likely blocked by CORS, continue with Steam
-    }
-
-    // Try Steam Community Market search (appid 730) - more generous with multiple attempts
-    try {
-      // Try exact match first
-      let url = `https://steamcommunity.com/market/search/render/?appid=730&norender=1&count=100&query=${encodeURIComponent(q)}`;
-      let res = await fetch(url, { method: 'GET' });
-      if (res.ok) {
-        const data = await res.json();
-        const results = (data?.results || []).map((r) => r.hash_name || r.name).filter(Boolean);
-        results.forEach((r) => allResults.add(r));
+      
+      if (!res.ok) throw new Error('Steam API request failed');
+      
+      const data = await res.json();
+      if (data && data.results && Array.isArray(data.results)) {
+        data.results.forEach((item) => {
+          const name = item.hash_name || item.name;
+          if (name && typeof name === 'string') {
+            const nameLower = name.toLowerCase();
+            // Only add if it contains ALL query words
+            if (queryWords.every(word => nameLower.includes(word))) {
+              results.add(name);
+            }
+          }
+        });
       }
       
-      // If query has multiple words, try partial matches
-      const words = q.split(/\s+/).filter(w => w.length > 2);
-      if (words.length > 1 && allResults.size < 10) {
-        for (const word of words.slice(0, 2)) {
-          url = `https://steamcommunity.com/market/search/render/?appid=730&norender=1&count=50&query=${encodeURIComponent(word)}`;
-          res = await fetch(url, { method: 'GET' });
-          if (res.ok) {
-            const data = await res.json();
-            const results = (data?.results || []).map((r) => r.hash_name || r.name).filter(Boolean);
-            results.forEach((r) => {
-              if (r.toLowerCase().includes(q.toLowerCase())) {
-                allResults.add(r);
-              }
+      // For multi-word searches, also try searching individual significant words
+      // This helps find items like "Glock-18 | Mirror Mosaic" when searching "mirror mosaic glock"
+      if (queryWords.length > 1 && results.size < 30) {
+        const significantWords = queryWords.filter(w => w.length >= 3);
+        for (const word of significantWords.slice(0, 2)) { // Limit to avoid too many requests
+          try {
+            const wordUrl = `https://steamcommunity.com/market/search/render/?appid=730&norender=1&count=50&query=${encodeURIComponent(word)}`;
+            const wordRes = await fetch(wordUrl, { 
+              method: 'GET',
+              signal: abortController?.signal
             });
+            if (wordRes.ok) {
+              const wordData = await wordRes.json();
+              if (wordData && wordData.results && Array.isArray(wordData.results)) {
+                wordData.results.forEach((item) => {
+                  const name = item.hash_name || item.name;
+                  if (name && typeof name === 'string') {
+                    const nameLower = name.toLowerCase();
+                    // Only add if it contains ALL words from the original query
+                    if (queryWords.every(w => nameLower.includes(w))) {
+                      results.add(name);
+                    }
+                  }
+                });
+              }
+            }
+          } catch (_) {
+            // Ignore individual word search errors
           }
         }
       }
-    } catch (_) {
-      // Steam failed, continue with fallbacks
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        return null; // Request was cancelled
+      }
+      // API failed, will fall back to local
     }
-
-    if (myTurn !== pending) return; // outdated
-
-    // Combine with local fallback
-    const local = localFallback(q);
-    local.forEach((n) => allResults.add(n));
-
-    // Also try fuzzy matching from local list
-    const fuzzy = fuzzyMatchLocal(q);
-    fuzzy.forEach((n) => allResults.add(n));
-
-    if (allResults.size > 0) {
-      show(Array.from(allResults), allResults.size > local.length ? 'Steam Market / CSFloat' : 'Local');
-      return;
-    }
-
-    // Last resort: show local matches
-    show(local.length > 0 ? local : [], 'Local');
-  }, 150);
-
-  input.addEventListener('input', debounced);
-  input.addEventListener('focus', () => {
-    if (input.value.trim().length >= 1) debounced();
-  });
-  document.addEventListener('click', (e) => {
-    if (!box.contains(e.target) && e.target !== input) hide();
-  });
-
-  function localFallback(q) {
-    const lq = q.toLowerCase();
-    return LOCAL_ITEM_FALLBACK.filter((n) => n.toLowerCase().includes(lq));
+    
+    return results.size > 0 ? Array.from(results) : null;
   }
 
-  function fuzzyMatchLocal(q) {
-    const lq = q.toLowerCase().split(/\s+/).filter(Boolean);
-    if (lq.length === 0) return [];
-    return LOCAL_ITEM_FALLBACK.filter((n) => {
-      const nl = n.toLowerCase();
-      return lq.some((term) => nl.includes(term));
+  const debounced = debounce(async () => {
+    const q = input.value.trim();
+    if (!q || q.length < 1) { 
+      hide(); 
+      return; 
+    }
+    
+    if (q === lastQuery) return; // Skip duplicate queries
+    lastQuery = q;
+    
+    // Cancel previous request if still pending
+    if (abortController) {
+      abortController.abort();
+    }
+    abortController = new AbortController();
+    
+    const myTurn = ++pending;
+    const allResults = new Set();
+    const qLower = q.toLowerCase();
+    const queryWords = qLower.split(/\s+/).filter(w => w.length > 0);
+    
+    // Try Steam Market API first
+    const steamResults = await searchSteamMarket(q);
+    
+    if (myTurn !== pending) return; // Outdated request
+    
+    if (steamResults && steamResults.length > 0) {
+      // Double-check all Steam results contain all query words
+      steamResults.forEach((name) => {
+        const nameLower = name.toLowerCase();
+        if (queryWords.every(word => nameLower.includes(word))) {
+          allResults.add(name);
+        }
+      });
+    }
+    
+    // Local fallback - only add items that contain ALL query words
+    const local = LOCAL_ITEM_FALLBACK.filter((n) => {
+      const nLower = n.toLowerCase();
+      return queryWords.every(word => nLower.includes(word));
     });
-  }
+    local.forEach((name) => allResults.add(name));
+    
+    if (allResults.size > 0) {
+      const sortedResults = Array.from(allResults).sort((a, b) => {
+        // Prioritize exact matches, then items starting with query
+        const aLower = a.toLowerCase();
+        const bLower = b.toLowerCase();
+        const qLower = q.toLowerCase();
+        const aStarts = aLower.startsWith(qLower);
+        const bStarts = bLower.startsWith(qLower);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        // Then prioritize items where query appears earlier
+        const aIndex = aLower.indexOf(qLower);
+        const bIndex = bLower.indexOf(qLower);
+        if (aIndex !== bIndex) return aIndex - bIndex;
+        return a.localeCompare(b);
+      });
+      
+      const source = steamResults && steamResults.length > 0 ? 'Steam Market' : 'Local';
+      show(sortedResults, source);
+    } else {
+      hide();
+    }
+  }, 250);
+
+  input.addEventListener('input', () => {
+    debounced();
+  });
+  
+  input.addEventListener('focus', () => {
+    if (input.value.trim().length >= 1) {
+      debounced();
+    }
+  });
+  
+  input.addEventListener('blur', (e) => {
+    // Delay hide to allow click on suggestions
+    setTimeout(() => {
+      if (!box.contains(document.activeElement)) {
+        hide();
+      }
+    }, 200);
+  });
+  
+  document.addEventListener('click', (e) => {
+    if (!box.contains(e.target) && e.target !== input) {
+      hide();
+    }
+  });
 }
 
 function debounce(fn, wait) {

@@ -8,52 +8,24 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css" />
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <script>
+      window.RECAPTCHA_SITE_KEY = 'YOUR_RECAPTCHA_SITE_KEY'; // Set this in your .env or config
+    </script>
   </head>
   <body>
     <div id="app">
       <!-- Auth Views -->
       <section id="auth-view" class="card auth">
         <h1>CS2 Profit & Loss</h1>
-        <div class="tabs">
-          <button id="tab-login" class="tab active">Login</button>
-          <button id="tab-signup" class="tab">Sign Up</button>
+        <div class="steam-login-container">
+          <p class="auth-description">Sign in with your Steam account to track your CS2 profits and losses.</p>
+          <a href="/auth/steam" class="steam-login-button">
+            <img src="https://steamcommunity-a.akamaihd.net/public/images/signinthroughsteam/sits_01.png" alt="Sign in through Steam" />
+          </a>
+          <p class="muted" style="margin-top: 16px;">Your data is securely stored on our servers.</p>
+          <p id="auth-error" class="error"></p>
         </div>
-
-        <form id="login-form" class="form visible" autocomplete="off">
-          <div class="field">
-            <label for="login-username">Username</label>
-            <input id="login-username" type="text" required />
-          </div>
-          <div class="field">
-            <label for="login-password">Password</label>
-            <input id="login-password" type="password" required />
-          </div>
-          <button type="submit" class="primary">Login</button>
-          <p class="muted">All data is stored locally in your browser.</p>
-          <p id="login-error" class="error"></p>
-        </form>
-
-        <form id="signup-form" class="form" autocomplete="off">
-          <div class="field">
-            <label for="signup-username">Username</label>
-            <input id="signup-username" type="text" required />
-          </div>
-          <div class="field">
-            <label for="signup-password">Password</label>
-            <input id="signup-password" type="password" required />
-          </div>
-          <div class="field">
-            <label for="signup-currency">Base Currency</label>
-            <select id="signup-currency">
-              <option value="AUD">AUD — Australian Dollar</option>
-              <option value="USD">USD — US Dollar</option>
-              <option value="EUR">EUR — Euro</option>
-            </select>
-          </div>
-          <button type="submit" class="primary">Create Account</button>
-          <p class="muted">You can change currency later in Settings.</p>
-          <p id="signup-error" class="error"></p>
-        </form>
       </section>
 
       <!-- App View -->
