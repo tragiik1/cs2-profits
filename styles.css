@@ -127,10 +127,34 @@ input[type="date"] { color-scheme: dark; }
 .stat-card.positive .stat-value { color: var(--positive); }
 .stat-card.negative .stat-value { color: var(--negative); }
 
+.chart-card { padding: 18px; }
+.chart-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+.chart-header h2 { margin: 0; font-family: var(--font-family); }
+.chart-periods { display: flex; gap: 6px; }
+.period-btn { 
+  background: transparent; 
+  color: var(--muted); 
+  border: 1px solid var(--border); 
+  border-radius: 8px; 
+  padding: 6px 12px; 
+  cursor: pointer; 
+  font-family: var(--font-family);
+  font-size: 13px;
+  transition: all 0.2s;
+}
+.period-btn:hover { border-color: var(--primary); color: var(--text); }
+.period-btn.active { 
+  background: var(--primary); 
+  color: #06121f; 
+  border-color: var(--primary); 
+  font-weight: 600;
+}
+.chart-wrapper { position: relative; height: 300px; width: 100%; }
+.chart-wrapper canvas { max-height: 300px; }
+
 .form-card { padding: 18px; }
 .form-card h2 { margin: 0 0 10px; font-family: var(--font-family); }
 .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-#regular-fields, #tradeup-fields { display: contents; }
 .form-actions { display: flex; gap: 8px; }
 
 .table-card { padding: 0; overflow: hidden; }
@@ -152,12 +176,17 @@ tbody tr:hover { background: rgba(255,255,255,0.02); }
   border: 1px solid var(--border); 
   color: var(--text); 
   border-radius: 8px; 
-  padding: 6px 8px; 
+  padding: 8px; 
   cursor: pointer; 
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--font-family);
-  font-size: 13px;
 }
 .icon-btn:hover { border-color: var(--primary); }
+.icon-btn svg {
+  display: block;
+}
 
 dialog::backdrop { background: rgba(0,0,0,0.6); }
 dialog { border: 1px solid var(--border); border-radius: 16px; background: #0f1419; color: var(--text); padding: 0; width: 520px; max-width: calc(100% - 24px); font-family: var(--font-family); }
@@ -176,11 +205,14 @@ dialog { border: 1px solid var(--border); border-radius: 16px; background: #0f14
 @media (max-width: 1000px) {
   .cards { grid-template-columns: repeat(2, 1fr); }
   .form-grid { grid-template-columns: repeat(2, 1fr); }
+  .chart-header { flex-direction: column; align-items: flex-start; }
+  .chart-periods { width: 100%; }
 }
 
 @media (max-width: 640px) {
   .cards { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
+  .chart-wrapper { height: 250px; }
 }
 
 
