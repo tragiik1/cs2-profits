@@ -72,11 +72,11 @@ async function getUserData() {
   }
 }
 
-async function saveUserData(userData, recaptchaToken = null) {
+async function saveUserData(userData) {
   try {
     const data = await apiRequest('/api/user/data', {
       method: 'POST',
-      body: JSON.stringify({ userData, recaptchaToken }),
+      body: JSON.stringify({ userData }),
     });
     return data.user;
   } catch (err) {
@@ -323,17 +323,7 @@ function escapeHtml(s) {
 
 async function persistUser(user) {
   try {
-    // Get reCAPTCHA token if available
-    let recaptchaToken = null;
-    if (window.grecaptcha && window.RECAPTCHA_SITE_KEY && window.RECAPTCHA_SITE_KEY !== 'YOUR_RECAPTCHA_SITE_KEY') {
-      try {
-        recaptchaToken = await window.grecaptcha.execute(window.RECAPTCHA_SITE_KEY, { action: 'save_user_data' });
-      } catch (err) {
-        console.warn('reCAPTCHA failed, continuing without it');
-      }
-    }
-    
-    const updatedUser = await saveUserData(user, recaptchaToken);
+    const updatedUser = await saveUserData(user);
     return updatedUser;
   } catch (err) {
     console.error('Failed to persist user:', err);

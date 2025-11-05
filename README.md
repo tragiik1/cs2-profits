@@ -1,20 +1,58 @@
-# CS2 Profit & Loss (Local)
+# CS2 Profit & Loss Tracker
 
-A clean, modern, dark-themed single-page web app to track Counter-Strike 2 profit and loss. Supports local accounts, per-account data storage in your browser, multiple currencies (AUD/USD/EUR) with live-rate fetch and manual overrides, and a dashboard with key metrics.
+A web application to track your Counter-Strike 2 profit and loss. Sign in with Steam, add your transactions, and see your profits/losses in real-time.
 
 ## Features
-- Local account signup/login (salted SHA-256 hashed password, stored locally)
-- Transactions table with: Date, Item Name, Type, Buy Price, Sell Price, Profit/Loss, Profit %, Notes
-- Dashboard: Total Spent, Total Profit, Total Loss, Profit %
-- Currencies: AUD, USD, EUR; display currency selectable; account base currency configurable
-- Live exchange rate fetch with manual overrides (Settings)
-- Import/Export your data (JSON)
 
-## Getting Started
-Simply open `index.html` in your browser. All data is stored in `localStorage` under your browser profile.
+- 🔐 **Steam Authentication** - Sign in with your Steam account (no password needed!)
+- 🔍 **Smart Item Search** - Search CS2 items with live suggestions from Steam Market
+- 📊 **Profit Tracking** - Track buy/sell prices and calculate your net profit/loss
+- 💱 **Multi-Currency** - Support for USD, AUD, EUR with live exchange rates
+- 📈 **Dashboard** - See your total spent, net profit, and profit percentage at a glance
+- 💾 **Data Export/Import** - Backup and restore your transaction data
 
-## Notes
-- This is a local app intended for personal use. There is no server. Do not reuse sensitive passwords.
-- Currency conversion: values are stored internally in your account base currency. Display conversion uses your exchange rates.
+## Quick Start (For Users)
+
+1. Visit the live website (your friend will share the URL)
+2. Click "Sign in through Steam"
+3. Start tracking your CS2 transactions!
+
+## For Developers: Local Setup
+
+If you want to run this locally:
+
+```bash
+npm install
+```
+
+Create a `.env` file:
+```env
+PORT=3000
+STEAM_API_KEY=your_steam_api_key
+STEAM_REALM=http://localhost:3000
+STEAM_RETURN_URL=http://localhost:3000/auth/steam/return
+SESSION_SECRET=your-random-secret-key
+NODE_ENV=development
+```
+
+Run:
+```bash
+npm start
+```
+
+## Deployment
+
+To deploy this live so others can use it, see [DEPLOY.md](./DEPLOY.md) for step-by-step instructions using Railway, Render, or Fly.io.
+
+## Tech Stack
+
+- **Frontend**: Vanilla JavaScript, HTML, CSS
+- **Backend**: Node.js, Express
+- **Authentication**: Steam OpenID (via Passport.js)
+- **Data Storage**: JSON file (can be upgraded to database)
+
+## License
+
+ISC
 
 

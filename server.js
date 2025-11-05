@@ -7,7 +7,6 @@ import bodyParser from 'body-parser';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import axios from 'axios';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -18,12 +17,17 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 const STEAM_API_KEY = process.env.STEAM_API_KEY || '';
-const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET || '';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'your-secret-key-change-this-in-production';
 
 // Steam OpenID realm and return URL
+// For production, set STEAM_REALM and STEAM_RETURN_URL to your deployed URL
 const realm = process.env.STEAM_REALM || `http://localhost:${PORT}`;
 const returnURL = process.env.STEAM_RETURN_URL || `${realm}/auth/steam/return`;
+
+// Log configuration on startup for debugging
+console.log('Steam Configuration:');
+console.log(`  Realm: ${realm}`);
+console.log(`  Return URL: ${returnURL}`);
 
 // Configure session
 app.use(session({
@@ -37,8 +41,13 @@ app.use(session({
   }
 }));
 
+// CORS configuration - allow requests from any origin in production
+const allowedOrigins = process.env.FRONTEND_URL 
+  ? [process.env.FRONTEND_URL] 
+  : (process.env.NODE_ENV === 'production' ? true : 'http://localhost:3000');
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: allowedOrigins,
   credentials: true
 }));
 
@@ -132,28 +141,6 @@ passport.deserializeUser((steamId, done) => {
   done(null, user);
 });
 
-// Verify reCAPTCHA
-async function verifyRecaptcha(token) {
-  if (!RECAPTCHA_SECRET) {
-    console.warn('reCAPTCHA secret not configured, skipping verification');
-    return true;
-  }
-  
-  try {
-    const response = await axios.post('https://www.google.com/recaptcha/api/siteverify', null, {
-      params: {
-        secret: RECAPTCHA_SECRET,
-        response: token
-      }
-    });
-    
-    return response.data.success === true;
-  } catch (error) {
-    console.error('reCAPTCHA verification error:', error);
-    return false;
-  }
-}
-
 // Routes
 app.get('/', (req, res) => {
   res.sendFile(join(__dirname, 'index.html'));
@@ -212,15 +199,7 @@ app.post('/api/user/data', async (req, res) => {
     return res.status(401).json({ error: 'Not authenticated' });
   }
   
-  const { userData, recaptchaToken } = req.body;
-  
-  // Verify reCAPTCHA if provided
-  if (recaptchaToken) {
-    const isValid = await verifyRecaptcha(recaptchaToken);
-    if (!isValid) {
-      return res.status(400).json({ error: 'reCAPTCHA verification failed' });
-    }
-  }
+  const { userData } = req.body;
   
   const user = getUserBySteamId(req.user.steamId);
   if (!user) {
@@ -244,8 +223,5 @@ app.listen(PORT, () => {
   console.log(`Steam authentication configured`);
   if (!STEAM_API_KEY) {
     console.warn('WARNING: STEAM_API_KEY not set. Get one from https://steamcommunity.com/dev/apikey');
-  }
-  if (!RECAPTCHA_SECRET) {
-    console.warn('WARNING: RECAPTCHA_SECRET not set. Get one from https://www.google.com/recaptcha/admin');
   }
 });
