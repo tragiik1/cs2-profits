@@ -58,7 +58,7 @@ body {
 
 .field { display: grid; gap: 6px; margin-bottom: 14px; }
 label { color: var(--muted); font-size: 13px; font-family: var(--font-family); }
-input, select { 
+input, select, textarea { 
   background: #0f1318; 
   color: var(--text); 
   border: 1px solid var(--border); 
@@ -66,6 +66,10 @@ input, select {
   padding: 10px 12px; 
   font-family: var(--font-family);
   font-size: 14px;
+}
+textarea {
+  resize: vertical;
+  min-height: 80px;
 }
 input::placeholder { color: #6b7280; }
 input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
@@ -126,6 +130,7 @@ input[type="date"] { color-scheme: dark; }
 .form-card { padding: 18px; }
 .form-card h2 { margin: 0 0 10px; font-family: var(--font-family); }
 .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+#regular-fields, #tradeup-fields { display: contents; }
 .form-actions { display: flex; gap: 8px; }
 
 .table-card { padding: 0; overflow: hidden; }
