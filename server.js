@@ -268,159 +268,163 @@ app.get('/api/inventory', async (req, res) => {
     console.log(`Fetching inventory for Steam ID: ${steamId}`);
     
     // CS2 App ID: 730
-    // Try context ID 2 first (standard CS2 inventory), then 6 if that fails
-    let url = `https://steamcommunity.com/inventory/${steamId}/730/2?l=english&count=5000`;
-    console.log(`Fetching from: ${url}`);
+    // Try different URL formats and context IDs
+    const contextIds = [2, 6, 1, 7]; // Try context ID 2 first (standard CS2), then others
+    const urlVariants = [
+      (cid) => `https://steamcommunity.com/inventory/${steamId}/730/${cid}?l=english&count=5000`,
+      (cid) => `https://steamcommunity.com/inventory/${steamId}/730/${cid}?l=english`,
+      (cid) => `https://steamcommunity.com/inventory/${steamId}/730/${cid}?l=english&count=5000&start_assetid=0`
+    ];
     
-    let response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': `https://steamcommunity.com/profiles/${steamId}/inventory/`,
-        'Origin': 'https://steamcommunity.com'
-      }
-    });
+    let response = null;
+    let responseText = '';
+    let success = false;
     
-    let responseText = await response.text();
-    console.log(`Steam API response status: ${response.status}`);
-    console.log(`Response text length: ${responseText.length}`);
-    console.log(`Response text (raw): ${JSON.stringify(responseText.substring(0, 200))}`);
-    
-    // If 400 error with context 2, try other context IDs
-    const contextIds = [6, 1, 7]; // Try other common context IDs
-    let contextIndex = 0;
-    
-    while (response.status === 400 && contextIndex < contextIds.length) {
-      const contextId = contextIds[contextIndex];
-      console.log(`Context ID 2 failed, trying context ID ${contextId}...`);
-      url = `https://steamcommunity.com/inventory/${steamId}/730/${contextId}?l=english&count=5000`;
-      response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'application/json, text/plain, */*',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Referer': `https://steamcommunity.com/profiles/${steamId}/inventory/`,
-          'Origin': 'https://steamcommunity.com'
-        }
-      });
-      responseText = await response.text();
-      console.log(`Steam API response status (context ${contextId}): ${response.status}`);
-      console.log(`Response text length: ${responseText.length}`);
-      console.log(`Response text (raw): ${JSON.stringify(responseText.substring(0, 200))}`);
+    // Try each context ID with different URL variants
+    for (const contextId of contextIds) {
+      if (success) break;
       
-      if (response.ok) {
-        console.log(`Success with context ID ${contextId}!`);
-        break;
-      }
-      
-      contextIndex++;
-    }
-    
-    // Handle null or empty responses (Steam returns null for empty inventories)
-    // Check for literal "null" string or actual null
-    const trimmedResponse = responseText.trim();
-    if (trimmedResponse === 'null' || trimmedResponse === '' || trimmedResponse === '{}' || trimmedResponse === '[]') {
-      console.log('Steam returned null/empty response for all context IDs');
-      console.log('This usually means:');
-      console.log('1. Inventory is actually empty for CS2');
-      console.log('2. Inventory privacy settings are blocking access');
-      console.log('3. Items are in a different game (not CS2)');
-      console.log(`Check inventory directly: https://steamcommunity.com/profiles/${steamId}/inventory/730/2/`);
-      return res.json({ 
-        items: [], 
-        total: 0, 
-        message: 'No CS2 items found in inventory. Steam returned null for all context IDs.',
-        help: `Check your inventory: https://steamcommunity.com/profiles/${steamId}/inventory/730/2/`
-      });
-    }
-    
-    // If status is 400 but we got some response text, try to parse it anyway
-    // Sometimes Steam returns 400 with valid JSON for empty inventories
-    if (response.status === 400 && trimmedResponse !== 'null') {
-      try {
-        const testData = JSON.parse(responseText);
-        // If it's valid JSON with empty assets, return empty
-        if (testData && (!testData.assets || testData.assets.length === 0)) {
-          console.log('Parsed 400 response - empty inventory');
-          return res.json({ items: [], total: 0, message: 'No CS2 items found in inventory' });
-        }
-        // If it has assets, use it!
-        if (testData.assets && testData.assets.length > 0) {
-          console.log('Found items in 400 response, processing...');
-          data = testData;
-          response.ok = true; // Override to continue processing
-        }
-      } catch (e) {
-        // Not JSON, continue with error handling below
-        console.log('400 response is not valid JSON');
-      }
-    }
-    
-    if (!response.ok) {
-      // Try to parse error message
-      let errorMessage = `Steam API error: ${response.status}`;
-      let errorDetails = '';
-      
-      try {
-        const errorData = JSON.parse(responseText);
-        if (errorData.error) {
-          errorMessage = errorData.error;
-        }
-        errorDetails = JSON.stringify(errorData);
-      } catch (e) {
-        // Not JSON, show first 200 chars of response
-        errorDetails = responseText.substring(0, 200);
-      }
-      
-      console.error('Steam API error details:', errorDetails);
-      
-      if (response.status === 400) {
-        // Check if it's actually an empty inventory (Steam sometimes returns 400 for empty)
+      for (const urlBuilder of urlVariants) {
+        const url = urlBuilder(contextId);
+        console.log(`Trying: ${url}`);
+        
         try {
-          const testData = JSON.parse(responseText);
-          if (!testData.assets || testData.assets.length === 0) {
-            return res.json({ items: [], total: 0, message: 'No CS2 items found in inventory' });
+          // Add small delay between requests to avoid rate limiting
+          if (response) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+          
+          response = await fetch(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+              'Accept': 'application/json, text/plain, */*',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'Accept-Encoding': 'gzip, deflate, br',
+              'Referer': `https://steamcommunity.com/profiles/${steamId}/inventory/`,
+              'Origin': 'https://steamcommunity.com',
+              'Cache-Control': 'no-cache',
+              'Connection': 'keep-alive',
+              'Sec-Fetch-Dest': 'empty',
+              'Sec-Fetch-Mode': 'cors',
+              'Sec-Fetch-Site': 'same-origin'
+            }
+          });
+          
+          responseText = await response.text();
+          console.log(`Response status: ${response.status}, length: ${responseText.length}`);
+          
+          // Check if we got a valid response (not "null")
+          const trimmed = responseText.trim();
+          if (trimmed === 'null' || trimmed === '') {
+            console.log(`Got null/empty response for context ${contextId}, trying next...`);
+            continue;
+          }
+          
+          // Try to parse as JSON
+          try {
+            const testData = JSON.parse(responseText);
+            // If it has the expected structure with assets or descriptions, we're good
+            // Even if status is 400, if we have valid data structure, use it
+            if (testData && (testData.assets !== undefined || testData.descriptions !== undefined)) {
+              // Even if assets is empty, if we have the structure, it's a valid response
+              console.log(`Success with context ID ${contextId}! Found ${testData.assets?.length || 0} assets (status: ${response.status})`);
+              success = true;
+              break;
+            }
+            // Check for error responses
+            if (testData.error || testData.success === false) {
+              console.log(`Steam returned error: ${testData.error || 'Unknown error'}`);
+              continue;
+            }
+          } catch (e) {
+            // Not valid JSON, continue
+            console.log(`Invalid JSON response, trying next...`);
+            continue;
+          }
+          
+          // If status is OK (200), we're done
+          if (response.ok && response.status === 200) {
+            success = true;
+            break;
+          }
+          
+          // Sometimes Steam returns 400 but with valid JSON data - check if we already handled it above
+          // If we get here and status is 400, it means the JSON didn't have the expected structure
+          if (response.status === 400) {
+            console.log(`400 status but no valid data structure, trying next...`);
+            continue;
+          }
+        } catch (err) {
+          console.log(`Error fetching context ${contextId}: ${err.message}`);
+          continue;
+        }
+      }
+    }
+    
+    // If we didn't get a successful response, use the last response for error handling
+    if (!success && !response) {
+      return res.status(500).json({ 
+        error: 'Failed to fetch inventory', 
+        message: 'Could not connect to Steam API',
+        steamId: steamId
+      });
+    }
+    
+    // Handle the response
+    if (!success) {
+      // All attempts failed - return helpful error message
+      const trimmedResponse = responseText.trim();
+      console.log('All inventory fetch attempts failed');
+      console.log(`Final response status: ${response?.status || 'N/A'}`);
+      console.log(`Final response text: ${trimmedResponse.substring(0, 200)}`);
+      
+      // If we got "null" responses, it likely means empty inventory or privacy issue
+      if (trimmedResponse === 'null' || trimmedResponse === '') {
+        return res.json({ 
+          items: [], 
+          total: 0, 
+          message: 'No CS2 items found in inventory. Steam returned null for all context IDs.',
+          steamId: steamId,
+          help: `Check your inventory: https://steamcommunity.com/profiles/${steamId}/inventory/730/2/`
+        });
+      }
+      
+      // Try to parse the last response to see if there's useful error info
+      if (responseText) {
+        try {
+          const errorData = JSON.parse(responseText);
+          if (errorData.error || errorData.message) {
+            return res.status(response?.status || 400).json({ 
+              error: errorData.error || 'Steam API error',
+              message: errorData.message || 'Failed to fetch inventory',
+              steamId: steamId
+            });
           }
         } catch (e) {
-          // If response is "null" as a string, treat as empty
-          if (responseText === 'null' || responseText.trim() === '') {
-            return res.json({ items: [], total: 0, message: 'No CS2 items found in inventory. Your inventory appears to be empty.' });
-          }
+          // Not JSON, continue
         }
-        
-        return res.status(400).json({ 
-          error: 'Bad request to Steam API', 
-          message: 'Steam returned a 400 error. This usually means: 1) Your inventory is empty, 2) You don\'t have CS2 items, or 3) Your inventory privacy settings are blocking access.',
-          steamId: steamId,
-          details: 'Try setting your Steam inventory to public and make sure you have CS2 items. Check your inventory at: https://steamcommunity.com/profiles/' + steamId + '/inventory/'
-        });
       }
-      if (response.status === 403) {
-        return res.status(403).json({ 
-          error: 'Inventory is private', 
-          message: 'Your Steam inventory privacy settings are set to private. Please set your inventory to public in Steam settings.' 
-        });
-      }
-      if (response.status === 404) {
-        return res.status(404).json({ 
-          error: 'Inventory not found', 
-          message: 'Could not find CS2 inventory. Make sure you have CS2 items in your inventory.' 
-        });
-      }
-      throw new Error(errorMessage);
+      
+      return res.status(response?.status || 400).json({ 
+        error: 'Failed to fetch inventory', 
+        message: 'Steam API returned an error for all context IDs. This could mean: 1) Your inventory is empty, 2) Inventory privacy settings are blocking access, or 3) You don\'t have CS2 items.',
+        steamId: steamId,
+        details: `Check your inventory: https://steamcommunity.com/profiles/${steamId}/inventory/730/2/`
+      });
     }
     
-    // Parse the response (only if we haven't already parsed it above)
+    // Parse the successful response
     let data;
-    if (!data) {
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        console.error('Failed to parse Steam API response:', responseText.substring(0, 200));
-        console.error('Parse error:', e.message);
-        throw new Error('Invalid response from Steam API: ' + e.message);
-      }
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse Steam API response:', responseText.substring(0, 200));
+      console.error('Parse error:', e.message);
+      return res.status(500).json({ 
+        error: 'Invalid response from Steam API', 
+        message: 'Steam returned data but it could not be parsed.',
+        steamId: steamId
+      });
     }
     
     console.log(`Received inventory data. Assets: ${data.assets?.length || 0}, Descriptions: ${data.descriptions?.length || 0}`);
