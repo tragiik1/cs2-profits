@@ -14,225 +14,275 @@
   </head>
   <body>
     <div id="app">
-      <section id="app-view">
-        <header class="topbar">
-          <div class="brand">
-            <div class="logo">$</div>
-            <div>
-              <div class="title">CS2 Profit & Loss</div>
+      <header class="topbar">
+        <div class="brand">
+          <div class="logo">$</div>
+          <div class="title">CS2 Profit & Loss</div>
+        </div>
+        <div class="actions">
+          <button id="sign-in-btn" class="ghost">Sign In</button>
+          <select id="display-currency" title="Display Currency"></select>
+          <button id="open-menu" class="ghost icon-btn" title="Menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="main-content">
+        <!-- Main Net Profit/Loss Display -->
+        <section class="hero-section">
+          <div class="net-profit-display" id="stat-net-card">
+            <div class="net-label">Net Profit / Loss</div>
+            <div class="net-value" id="stat-net">—</div>
+            <div class="net-actions">
+              <button id="add-transaction-btn" class="primary large-btn">Add</button>
             </div>
           </div>
-          <div class="actions">
-            <select id="display-currency" title="Display Currency"></select>
-            <button id="open-settings" class="ghost">Settings</button>
+        </section>
+
+        <!-- Analytics Section -->
+        <section class="analytics-section">
+          <button class="section-toggle" id="analytics-toggle">
+            <span>Analytics</span>
+            <svg class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+          <div class="analytics-content" id="analytics-content">
+            <div class="analytics-grid">
+              <div class="analytics-card">
+                <div class="analytics-label">Total Spent</div>
+                <div class="analytics-value" id="stat-spent">—</div>
+              </div>
+              <div class="analytics-card">
+                <div class="analytics-label">Profit %</div>
+                <div class="analytics-value" id="stat-profit-pct">—</div>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3>Profit / Loss Over Time</h3>
+                <div class="chart-periods">
+                  <button class="period-btn" data-period="24h">24h</button>
+                  <button class="period-btn" data-period="week">Week</button>
+                  <button class="period-btn active" data-period="month">Month</button>
+                  <button class="period-btn" data-period="lifetime">Lifetime</button>
+                </div>
+              </div>
+              <div class="chart-wrapper">
+                <canvas id="profit-chart"></canvas>
+              </div>
+            </div>
           </div>
-        </header>
+        </section>
 
-        <main class="grid">
-          <section class="cards">
-            <div class="stat-card">
-              <div class="stat-label">Total Spent</div>
-              <div class="stat-value" id="stat-spent">—</div>
-            </div>
-            <div class="stat-card" id="stat-net-card">
-              <div class="stat-label">Net Profit / Loss</div>
-              <div class="stat-value" id="stat-net">—</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Profit %</div>
-              <div class="stat-value" id="stat-profit-pct">—</div>
-            </div>
-          </section>
+        <!-- Inventory Section (only shown when signed in) -->
+        <section class="inventory-section" id="inventory-section" style="display: none;">
+          <div class="section-header">
+            <h2>CS2 Inventory</h2>
+            <button id="refresh-inventory-btn" class="ghost">Refresh</button>
+          </div>
+          <div class="inventory-grid" id="inventory-grid">
+            <div class="inventory-loading">Loading inventory...</div>
+          </div>
+        </section>
 
-          <section class="card chart-card">
-            <div class="chart-header">
-              <h2>Profit / Loss Over Time</h2>
-              <div class="chart-periods">
-                <button class="period-btn" data-period="24h">24h</button>
-                <button class="period-btn" data-period="week">Week</button>
-                <button class="period-btn active" data-period="month">Month</button>
-                <button class="period-btn" data-period="lifetime">Lifetime</button>
-              </div>
-            </div>
-            <div class="chart-wrapper">
-              <canvas id="profit-chart"></canvas>
-            </div>
-          </section>
+        <!-- History Section -->
+        <section class="history-section">
+          <div class="section-header">
+            <h2>History</h2>
+            <input id="search" type="text" placeholder="Search items/notes" class="search-input" />
+          </div>
+          <div class="table-wrapper">
+            <table id="tx-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Item Name</th>
+                  <th>Type</th>
+                  <th>Buy Price</th>
+                  <th>Sell Price</th>
+                  <th>Profit / Loss</th>
+                  <th>Profit %</th>
+                  <th>Notes</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="tx-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
 
-          <section class="card form-card">
-            <h2>Add Transaction</h2>
-            <form id="tx-form" autocomplete="off">
-              <div class="form-grid">
-                <div class="field">
-                  <label for="tx-date">Date</label>
-                  <input id="tx-date" type="date" required />
-                </div>
-                <div class="field">
-                  <label for="tx-type">Type</label>
-                  <select id="tx-type" required>
-                    <option value="Case">Case</option>
-                    <option value="Trade">Trade</option>
-                    <option value="Trade-up">Trade-up</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="tx-item">Item Name</label>
-                  <input id="tx-item" type="text" placeholder="e.g. Kilowatt Case" autocomplete="off" required />
-                </div>
-                <div class="field">
-                  <label for="tx-buy">Buy Price</label>
-                  <input id="tx-buy" type="number" step="0.01" min="0" required />
-                </div>
-                <div class="field">
-                  <label for="tx-sell">Sell Price</label>
-                  <input id="tx-sell" type="number" step="0.01" min="0" />
-                </div>
-                <div class="field">
-                  <label for="tx-notes">Notes</label>
-                  <input id="tx-notes" type="text" placeholder="Optional" />
-                </div>
-                <div class="field">
-                  <label for="tx-currency">Currency</label>
-                  <select id="tx-currency"></select>
-                </div>
-              </div>
-              <div class="form-actions">
-                <button type="submit" class="primary">Add</button>
-                <button type="reset" class="ghost">Clear</button>
-              </div>
-            </form>
-          </section>
+      <!-- Menu Modal -->
+      <dialog id="menu-modal">
+        <form method="dialog" class="menu-dialog">
+          <h3>Menu</h3>
+          <div class="menu-actions">
+            <button id="menu-settings" type="button" class="menu-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"></path>
+              </svg>
+              Settings
+            </button>
+            <button id="menu-import" type="button" class="menu-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Import
+            </button>
+            <button id="menu-export" type="button" class="menu-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              Export
+            </button>
+          </div>
+          <menu class="dialog-actions">
+            <button value="cancel" class="ghost">Close</button>
+          </menu>
+        </form>
+      </dialog>
 
-          <section class="card table-card">
-            <div class="table-header">
-              <h2>Transactions</h2>
-              <div class="table-actions">
-                <input id="search" type="text" placeholder="Search items/notes" />
-                <button id="open-import" class="ghost icon-btn" title="Import">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                  </svg>
-                </button>
-                <button id="open-export" class="ghost icon-btn" title="Export">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="17 8 12 3 7 8"></polyline>
-                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div class="table-wrapper">
-              <table id="tx-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Item Name</th>
-                    <th>Type</th>
-                    <th>Buy Price</th>
-                    <th>Sell Price</th>
-                    <th>Profit / Loss</th>
-                    <th>Profit %</th>
-                    <th>Notes</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="tx-tbody"></tbody>
-              </table>
-            </div>
-          </section>
-        </main>
-
-        <!-- Settings Modal -->
-        <dialog id="settings-modal">
-          <form method="dialog" class="settings">
-            <h3>Settings</h3>
+      <!-- Add Transaction Modal -->
+      <dialog id="add-transaction-modal">
+        <form method="dialog" id="tx-form" class="transaction-form" autocomplete="off">
+          <h3>Add Transaction</h3>
+          <div class="form-grid">
             <div class="field">
-              <label for="base-currency">Account Base Currency</label>
-              <select id="base-currency"></select>
+              <label for="tx-date">Date</label>
+              <input id="tx-date" type="date" required />
             </div>
-            <div class="rates">
-              <div class="rates-header">
-                <div>
-                  <strong>Exchange Rates</strong>
-                  <span class="muted">Relative to base currency</span>
-                </div>
-                <button id="refresh-rates" class="ghost" type="button">Refresh</button>
+            <div class="field">
+              <label for="tx-type">Type</label>
+              <select id="tx-type" required>
+                <option value="Case">Case</option>
+                <option value="Trade">Trade</option>
+                <option value="Trade-up">Trade-up</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="tx-item">Item Name</label>
+              <input id="tx-item" type="text" placeholder="e.g. Kilowatt Case" autocomplete="off" required />
+            </div>
+            <div class="field">
+              <label for="tx-buy">Buy Price</label>
+              <input id="tx-buy" type="number" step="0.01" min="0" required />
+            </div>
+            <div class="field">
+              <label for="tx-sell">Sell Price</label>
+              <input id="tx-sell" type="number" step="0.01" min="0" />
+            </div>
+            <div class="field">
+              <label for="tx-notes">Notes</label>
+              <input id="tx-notes" type="text" placeholder="Optional" />
+            </div>
+            <div class="field">
+              <label for="tx-currency">Currency</label>
+              <select id="tx-currency"></select>
+            </div>
+          </div>
+          <menu class="dialog-actions">
+            <button type="reset" class="ghost">Clear</button>
+            <button type="submit" class="primary">Add Transaction</button>
+          </menu>
+        </form>
+      </dialog>
+
+      <!-- Settings Modal -->
+      <dialog id="settings-modal">
+        <form method="dialog" class="settings">
+          <h3>Settings</h3>
+          <div class="field">
+            <label for="base-currency">Account Base Currency</label>
+            <select id="base-currency"></select>
+          </div>
+          <div class="rates">
+            <div class="rates-header">
+              <div>
+                <strong>Exchange Rates</strong>
+                <span class="muted">Relative to base currency</span>
               </div>
-              <div id="rates-list" class="rates-list"></div>
-              <p class="muted">If live fetch fails, you can edit rates manually.</p>
+              <button id="refresh-rates" class="ghost" type="button">Refresh</button>
             </div>
-            <menu class="dialog-actions">
-              <button value="cancel" class="ghost">Close</button>
-              <button id="save-settings" value="default" class="primary">Save</button>
-            </menu>
-          </form>
-        </dialog>
+            <div id="rates-list" class="rates-list"></div>
+            <p class="muted">If live fetch fails, you can edit rates manually.</p>
+          </div>
+          <menu class="dialog-actions">
+            <button value="cancel" class="ghost">Close</button>
+            <button id="save-settings" value="default" class="primary">Save</button>
+          </menu>
+        </form>
+      </dialog>
 
-        <!-- Export Modal -->
-        <dialog id="export-modal">
-          <form method="dialog" class="settings">
-            <h3>Export Data</h3>
-            <div style="display: flex; flex-direction: row; gap: 12px; margin-top: 16px;">
-              <button id="export-json-btn" type="button" class="primary" style="flex: 1; justify-content: center; display: flex; align-items: center; gap: 8px;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="17 8 12 3 7 8"></polyline>
-                  <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
-                JSON
-              </button>
-              <button id="export-excel-btn" type="button" class="primary" style="flex: 1; justify-content: center; display: flex; align-items: center; gap: 8px;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="17 8 12 3 7 8"></polyline>
-                  <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
-                Excel
-              </button>
-            </div>
-            <menu class="dialog-actions">
-              <button value="cancel" class="ghost">Close</button>
-            </menu>
-          </form>
-        </dialog>
+      <!-- Export Modal -->
+      <dialog id="export-modal">
+        <form method="dialog" class="settings">
+          <h3>Export Data</h3>
+          <div class="export-buttons">
+            <button id="export-json-btn" type="button" class="primary export-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              JSON
+            </button>
+            <button id="export-excel-btn" type="button" class="primary export-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              Excel
+            </button>
+          </div>
+          <menu class="dialog-actions">
+            <button value="cancel" class="ghost">Close</button>
+          </menu>
+        </form>
+      </dialog>
 
-        <!-- Import Modal -->
-        <dialog id="import-modal">
-          <form method="dialog" class="settings">
-            <h3>Import Data</h3>
-            <div style="display: flex; flex-direction: row; gap: 12px; margin-top: 16px;">
-              <label class="file-btn primary" style="cursor: pointer; flex: 1; justify-content: center; display: flex; align-items: center; gap: 8px;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="7 10 12 15 17 10"></polyline>
-                  <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                JSON
-                <input id="import-json" type="file" accept="application/json,.json" hidden />
-              </label>
-              <label class="file-btn primary" style="cursor: pointer; flex: 1; justify-content: center; display: flex; align-items: center; gap: 8px;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="7 10 12 15 17 10"></polyline>
-                  <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                Excel
-                <input id="import-excel" type="file" accept=".xlsx,.xls" hidden />
-              </label>
-            </div>
-            <menu class="dialog-actions">
-              <button value="cancel" class="ghost">Close</button>
-            </menu>
-          </form>
-        </dialog>
-      </section>
+      <!-- Import Modal -->
+      <dialog id="import-modal">
+        <form method="dialog" class="settings">
+          <h3>Import Data</h3>
+          <div class="import-buttons">
+            <label class="file-btn primary import-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              JSON
+              <input id="import-json" type="file" accept="application/json,.json" hidden />
+            </label>
+            <label class="file-btn primary import-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Excel
+              <input id="import-excel" type="file" accept=".xlsx,.xls" hidden />
+            </label>
+          </div>
+          <menu class="dialog-actions">
+            <button value="cancel" class="ghost">Close</button>
+          </menu>
+        </form>
+      </dialog>
     </div>
 
     <script src="app.js"></script>
   </body>
 </html>
-
-
