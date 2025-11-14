@@ -3,11 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CS2 Profit & Loss</title>
+    <title>CS2P&L</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50' y='50' font-size='70' fill='white' text-anchor='middle' dominant-baseline='middle' font-family='Arial,sans-serif' font-weight='bold'>$</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.bunny.net/css?family=montserrat:600,700" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -16,10 +17,15 @@
     <div id="app">
       <header class="topbar">
         <div class="brand">
-          <div class="logo">$</div>
-          <div class="title">CS2 Profit & Loss</div>
+          <div class="title">CS2P&L</div>
         </div>
         <div class="actions">
+          <button id="open-search-btn" class="ghost icon-btn" title="Search CS2 Items (Ctrl+K)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.35-4.35"></path>
+            </svg>
+          </button>
           <button id="sign-in-btn" class="ghost">Sign In</button>
           <select id="display-currency" title="Display Currency"></select>
           <button id="open-menu" class="ghost icon-btn" title="Menu">
@@ -84,7 +90,39 @@
         <section class="inventory-section" id="inventory-section" style="display: none;">
           <div class="section-header">
             <h2>CS2 Inventory</h2>
-            <button id="refresh-inventory-btn" class="ghost">Refresh</button>
+            <div class="section-header-actions">
+              <button id="inventory-filter-btn" class="ghost" title="Filter Inventory">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                </svg>
+                Filter
+              </button>
+              <button id="refresh-inventory-btn" class="ghost">Refresh</button>
+            </div>
+          </div>
+          <div class="inventory-filters" id="inventory-filters" style="display: none;">
+            <div class="filter-group">
+              <label>Type</label>
+              <select id="inventory-filter-type">
+                <option value="">All Types</option>
+                <option value="Weapon">Weapon</option>
+                <option value="Container">Container</option>
+                <option value="Sticker">Sticker</option>
+                <option value="Graffiti">Graffiti</option>
+                <option value="Music Kit">Music Kit</option>
+                <option value="Key">Key</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>Price Range</label>
+              <div class="price-range-inputs">
+                <input type="number" id="inventory-filter-price-min" placeholder="Min" step="0.01" min="0" />
+                <span>to</span>
+                <input type="number" id="inventory-filter-price-max" placeholder="Max" step="0.01" min="0" />
+              </div>
+            </div>
+            <button id="inventory-filter-apply" class="primary">Apply</button>
+            <button id="inventory-filter-clear" class="ghost">Clear</button>
           </div>
           <div class="inventory-grid" id="inventory-grid">
             <div class="inventory-loading">Loading inventory...</div>
@@ -95,15 +133,70 @@
         <section class="history-section">
           <div class="section-header">
             <h2>History</h2>
-            <input id="search" type="text" placeholder="Search items/notes" class="search-input" />
+            <div class="section-header-actions">
+              <button id="transaction-filter-btn" class="ghost" title="Filter Transactions">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                </svg>
+                Filter
+              </button>
+              <button id="bulk-actions-btn" class="ghost" title="Bulk Actions" style="display: none;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="9" y1="3" x2="9" y2="21"></line>
+                </svg>
+                Bulk Actions
+              </button>
+              <input id="search" type="text" placeholder="Search items/notes" class="search-input" />
+            </div>
+          </div>
+          <div class="transaction-filters" id="transaction-filters" style="display: none;">
+            <div class="filter-group">
+              <label>Date Range</label>
+              <div class="date-range-inputs">
+                <input type="date" id="transaction-filter-date-from" />
+                <span>to</span>
+                <input type="date" id="transaction-filter-date-to" />
+              </div>
+            </div>
+            <div class="filter-group">
+              <label>Type</label>
+              <select id="transaction-filter-type">
+                <option value="">All Types</option>
+                <option value="Case">Case</option>
+                <option value="Trade">Trade</option>
+                <option value="Trade-up">Trade-up</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>Profit Range</label>
+              <div class="price-range-inputs">
+                <input type="number" id="transaction-filter-profit-min" placeholder="Min" step="0.01" />
+                <span>to</span>
+                <input type="number" id="transaction-filter-profit-max" placeholder="Max" step="0.01" />
+              </div>
+            </div>
+            <button id="transaction-filter-apply" class="primary">Apply</button>
+            <button id="transaction-filter-clear" class="ghost">Clear</button>
+          </div>
+          <div class="bulk-actions-bar" id="bulk-actions-bar" style="display: none;">
+            <span id="bulk-selected-count">0 selected</span>
+            <div class="bulk-actions-buttons">
+              <button id="bulk-delete-btn" class="ghost danger">Delete</button>
+              <button id="bulk-close-btn" class="ghost">Close</button>
+            </div>
           </div>
           <div class="table-wrapper">
             <table id="tx-table">
               <thead>
                 <tr>
+                  <th style="width: 40px;">
+                    <input type="checkbox" id="select-all-checkbox" title="Select All" />
+                  </th>
                   <th>Date</th>
                   <th>Item Name</th>
                   <th>Type</th>
+                  <th>Qty</th>
                   <th>Buy Price</th>
                   <th>Sell Price</th>
                   <th>Profit / Loss</th>
@@ -175,11 +268,15 @@
               <input id="tx-item" type="text" placeholder="e.g. Kilowatt Case" autocomplete="off" required />
             </div>
             <div class="field">
-              <label for="tx-buy">Buy Price</label>
+              <label for="tx-quantity">Quantity</label>
+              <input id="tx-quantity" type="number" step="1" min="1" value="1" required />
+            </div>
+            <div class="field">
+              <label for="tx-buy">Buy Price (per item)</label>
               <input id="tx-buy" type="number" step="0.01" min="0" required />
             </div>
             <div class="field">
-              <label for="tx-sell">Sell Price</label>
+              <label for="tx-sell">Sell Price (per item)</label>
               <input id="tx-sell" type="number" step="0.01" min="0" />
             </div>
             <div class="field">
@@ -192,7 +289,7 @@
             </div>
           </div>
           <menu class="dialog-actions">
-            <button type="reset" class="ghost">Clear</button>
+            <button type="button" class="ghost" onclick="document.getElementById('add-transaction-modal').close()">Close</button>
             <button type="submit" class="primary">Add Transaction</button>
           </menu>
         </form>
@@ -281,6 +378,30 @@
           </menu>
         </form>
       </dialog>
+
+      <!-- CSFloat-style Search Overlay -->
+      <div id="search-overlay" class="search-overlay" style="display: none;">
+        <div class="search-overlay-content">
+          <div class="search-overlay-header">
+            <input 
+              type="text" 
+              id="search-overlay-input" 
+              class="search-overlay-input" 
+              placeholder="Search CS2 items (skins, stickers, cases, etc.)..."
+              autocomplete="off"
+            />
+            <button id="search-overlay-close" class="search-overlay-close">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div id="search-overlay-results" class="search-overlay-results">
+            <div class="search-overlay-empty">Start typing to search for CS2 items...</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script src="app.js"></script>
